@@ -1,3 +1,4 @@
+import vista.VistaChat;
 import java.io.*;
 import java.net.*;
 import java.util.Scanner;
@@ -7,35 +8,43 @@ public class Cliente {
         String host = "localhost";
         int puerto = 12345;
 
-        try (Socket socket = new Socket(host, puerto)) {
-            PrintWriter salida = new PrintWriter(socket.getOutputStream(), true);
-            BufferedReader entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            Scanner sc = new Scanner(System.in);
+        // 1. Iniciamos y mostramos la ventana (la Vista)
+        VistaChat vista = new VistaChat();
+        vista.setVisible(true);
 
-            //hilo que escucha mensajes del servidor en todo momento
+        try {
+            // 2. Nos conectamos al servidor (sin try-with-resources para no cerrar el socket prematuramente)
+            Socket socket = new Socket(host, puerto);
+            PrintWriter salida = new PrintWriter(socket.getOutputStream(), true);
+            Buffe   redReader entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+            // 3. Enlazamos la acción de escribir un mensaje en la ventana con el envío de datos
+            vista.configurarAccionEnviar(e -> {
+                String mensajeUsuario = vista.getMensajeYLimpiar(); // Obtenemos el texto y limpiamos la caja
+                if (!mensajeUsuario.trim().isEmpty()) {
+                    salida.println(mensajeUsuario); // Enviamos al servidor
+                    if (mensajeUsuario.equalsIgnoreCase("salir")) {
+                        System.exit(0); // Cierra todo si el usuario escribe "salir"
+                    }
+                }
+            });
+
+            // 4. Hilo que escucha mensajes del servidor en todo momento (Tu código original adaptado)
             Thread escucha = new Thread(() -> {
                 try {
                     String mensajeServidor;
                     while ((mensajeServidor = entrada.readLine()) != null) {
-                        System.out.println(mensajeServidor);
+                        vista.mostrarMensaje(mensajeServidor); // Muestra en Swing en vez de consola
                     }
                 } catch (IOException e) {
-                    System.out.println("[INFO] Conexion con el servidor cerrada.");
+                    vista.mostrarMensaje("[INFO] Conexion con el servidor cerrada.");
                 }
             });
             escucha.setDaemon(true);
             escucha.start();
 
-            //hilo principal: el usuario escribe y envía mensajes
-            String mensajeUsuario;
-            while (sc.hasNextLine()) {
-                mensajeUsuario = sc.nextLine();
-                salida.println(mensajeUsuario);
-                if (mensajeUsuario.equalsIgnoreCase("salir")) break;
-            }
-
         } catch (IOException e) {
-            System.out.println("[ERROR] En el cliente: " + e.getMessage());
+            vista.mostrarMensaje("[ERROR] En el cliente: " + e.getMessage());
         }
     }
 }
